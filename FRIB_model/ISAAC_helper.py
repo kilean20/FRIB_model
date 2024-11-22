@@ -19,17 +19,11 @@ from .utils import get_Dnum_from_pv, post_process_BPMdf, datetime_from_Ymd_HMS, 
 from .flame_helper import convert, get_FMelem_from_PVs
 
 
-if os.path.exists("/files/shared/ap/ISAAC/data"): 
-    _ISAAC_database_path = "/files/shared/ap/ISAAC/data"
-elif os.path.exists('/media/sf_HWANG/Workspace/BPM4pickup/ISAAC_data'): 
-    _ISAAC_database_path = '/media/sf_HWANG/Workspace/BPM4pickup/ISAAC_data'
-else:
-    _ISAAC_database_path = None
     
        
 def get_reconst_summary_from_ISAAC_data_rel_path(
     ISAAC_data_rel_path,
-    ISAAC_database_path = _ISAAC_database_path,
+    ISAAC_database_path,
     ):
     
     # find the best reconst_output folder
@@ -67,7 +61,7 @@ def get_reconst_summary_from_ISAAC_data_rel_path(
 def get_flame_evals_n_goals_from_reconst_summary(
     reconst_summary = None,
     ISAAC_data_rel_path = None,
-    ISAAC_database_path = _ISAAC_database_path,
+    ISAAC_database_path = None,
     ignore_coupling = False,
     fm = None,
     return_flame=False):
@@ -81,7 +75,8 @@ def get_flame_evals_n_goals_from_reconst_summary(
         _bmstateKeys = ["xrms","yrms","cxy"]
     if reconst_summary is None:
         assert ISAAC_data_rel_path is not None
-        reconst_summary = get_reconst_summary_from_ISAACdata_rel_path(ISAAC_data_rel_path = ISAAC_data_rel_path, 
+        assert ISAAC_database_path is not None
+        reconst_summary = get_reconst_summary_from_ISAAC_data_rel_path(ISAAC_data_rel_path = ISAAC_data_rel_path, 
                                                                       ISAAC_database_path = ISAAC_database_path)
     if fm is None:
         flame_lat = reconst_summary['reconst_output']['flat']
@@ -237,7 +232,7 @@ def get_ISAAC_BPM_data_df(path: str,
 #             mask = np.logical_or(too_large_mean_err, is_beam_loss)
             mask = is_beam_loss
             df.loc[mask, name] = df[name][mask].ffill()
-    
+    output['values'] = output['values'].apply(pd.to_numeric, errors='ignore')
     return output
 
 
@@ -277,7 +272,7 @@ def filter_err_out_from_ISAAC_summary(ISAAC_summary: Dict) -> Tuple[int, Union[D
 
 
 def get_related_ISAAC_data_rel_path(ISAAC_data_rel_path, 
-                                    ISAAC_database_path = _ISAAC_database_path, 
+                                    ISAAC_database_path, 
                                     within_minutes = 50,
                                     filter_out_path_with_reconstruct = True):
     segment = None
@@ -303,14 +298,3 @@ def get_related_ISAAC_data_rel_path(ISAAC_data_rel_path,
         data_path_l = tmp      
     return data_path_l
 
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    

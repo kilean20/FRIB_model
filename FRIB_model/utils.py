@@ -383,7 +383,7 @@ def get_consistent_row_from_two_BPMdf(df_test, df_ref, should_consistent_upto_Dn
         mean = df_ref[name].loc[:, ['XPOS', 'YPOS', 'MAG', 'Q']].mean()
         for k in ['XPOS', 'YPOS']:
             if np.isnan(mean[k]):
-                continue                
+                continue
             consistent_irow = np.logical_and(consistent_irow, (mean[k] - df_test[name][k]).abs() < 0.2)
         consistent_irow = np.logical_and(consistent_irow, (1 - df_test[name]['MAG'] / mean['MAG']).abs() < 0.1)
         consistent_irow = np.logical_and(consistent_irow, (mean['Q'] - df_test[name]['Q']).abs() < 0.1)

@@ -2,22 +2,22 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from .ISAAC_helper import _ISAAC_database_path, get_ISAAC_BPM_data_df, get_flame_evals_n_goals_from_reconst_summary, get_reconst_summary_from_ISAAC_data_rel_path, get_related_ISAAC_data_rel_path
+from .ISAAC_helper import get_ISAAC_BPM_data_df, get_flame_evals_n_goals_from_reconst_summary, get_reconst_summary_from_ISAAC_data_rel_path, get_related_ISAAC_data_rel_path
 from .flame_helper import evaluate_flame_evals, from_flame_evals_to_machine_evals, fit_moment1, from_machine_evals_to_flame_evals
 from .utils import get_Dnum_from_pv, get_consistent_row_from_two_BPMdf, match_rows_of_two_df, sort_by_Dnum
 from collections import OrderedDict
 
 
 def get_BPMQ_training_data_from_ISAAC_data(ISAAC_data_rel_path,
-                           ISAAC_database_path = _ISAAC_database_path,
-                           from_element = None,
-                           to_element   = None,
-                           ignore_coupling = False,
-                           plot_data    = False,
-                           plot_Qlim    = None,
-                           plot_xylim   = None,
-                           return_flameinfo = False,
-                          ):
+                                           ISAAC_database_path,
+                                           from_element = None,
+                                           to_element   = None,
+                                           ignore_coupling = False,
+                                           plot_data    = False,
+                                           plot_Qlim    = None,
+                                           plot_xylim   = None,
+                                           return_flameinfo = False,
+                                          ):
     reconst_summary = get_reconst_summary_from_ISAAC_data_rel_path(
         ISAAC_data_rel_path = ISAAC_data_rel_path, 
         ISAAC_database_path = ISAAC_database_path)
@@ -108,7 +108,7 @@ def get_BPMQ_training_data_from_ISAAC_data(ISAAC_data_rel_path,
         fm_evals,fm,from_bmstate,
         monitor_indices = monitor_indices,
         monitor_names   = monitor_names,
-        from_element    = i_from_element,
+        from_element    = max(i_from_element-1,0),
         to_element      = i_to_element,
     )
     
@@ -165,7 +165,7 @@ def get_BPMQ_training_data_from_ISAAC_data(ISAAC_data_rel_path,
         fm_evals_new,fm,from_bmstate,
         monitor_indices = monitor_indices,
         monitor_names   = monitor_names,
-        from_element    = i_from_element,
+        from_element    = i_from_element-1,
         to_element      = i_to_element,
     )
     

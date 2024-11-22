@@ -618,8 +618,8 @@ def evaluate_flame_evals(
             elem_name  = name_field[0]
             elem_field = name_field[1]
             elem_index = flame_evals['info'][elem_name]['index']
-            #print("elem_index, {elem_field: value}",elem_index, {elem_field: value})
             fm.reconfigure(elem_index, {elem_field: value})
+        
         
         r, s = fm.run(bmstate = from_bmstate,
                       monitor = monitor_indices, 
