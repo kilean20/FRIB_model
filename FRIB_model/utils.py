@@ -36,7 +36,8 @@ _name_conversions =(
             
 def NelderMead(loss_ftn, x0, simplex_size: float = 0.05, 
                              bounds: Optional[List[Tuple[float, float]]] = None, 
-                             tol: float = 1e-4):
+                             tol: float = 1e-4,
+                             **kwargs):
     """
     Perform optimization using the Nelder-Mead method.
 
@@ -74,7 +75,7 @@ def NelderMead(loss_ftn, x0, simplex_size: float = 0.05,
             initial_simplex[i + 1, :] = np.clip(initial_simplex[i + 1, :], a_min=bounds[:, 0], a_max=bounds[:, 1])
 
     result = optimize.minimize(loss_ftn, x0, method='Nelder-Mead', bounds=bounds, tol=tol,
-                               options={'initial_simplex': initial_simplex})
+                               options={'initial_simplex': initial_simplex},**kwargs)
 
     return result
 
@@ -284,8 +285,8 @@ def post_process_BPMdf(df,from_Dnum,to_Dnum,fill_NaN_for_large_MAG_err=True,inde
     if fill_NaN_for_large_MAG_err:
 #         pd.set_option('future.no_silent_downcasting', True) # suppress warning regarding ffill()
         for name in BPMnames:
-            # Standard mean error of BPM_MAG should be less than 5%
-            mask = df[name]['MAG_err'] > 0.05 * df[name]['MAG']
+            # Standard mean error of BPM_MAG should be less than 2%
+            mask = df[name]['MAG_err'] > 0.02 * df[name]['MAG']
             df.loc[mask, name] = df[name][mask].ffill()
 #     pd.set_option('future.no_silent_downcasting', False)
     return df
@@ -297,16 +298,16 @@ def fill_NaN_for_suspicious_BPMdata_based_on_MAG(df):
     df = df.copy()
     
     for name in BPMnames:
-        # Standard mean error of BPM_MAG should be less than 5%
-        mask = df[name]['MAG_err'] > 0.05 * df[name]['MAG']
+        # Standard mean error of BPM_MAG should be less than 2%
+        mask = df[name]['MAG_err'] > 0.02 * df[name]['MAG']
         df.loc[mask, name] = df[name][mask].ffill()
         if np.any(mask):
             print(name, 'removed data fraction due to large MAG noise:', 1 -mask.sum() / len(mask))
 
     mag0 = df[(BPMnames[0],'MAG')]
     for name in BPMnames[1:]:
-        # Beam loss: BPM_MAG (+mean_err) should not be less than 90% of 0.9 quantile over samples
-        mask = (df[(name,'MAG')] +df[(name,'MAG_err')])/mag0 < 0.95 * (df[(name,'MAG')]/mag0).quantile(0.95)
+        # Beam loss: BPM_MAG (+mean_err) should not be less than 98% of 0.95 quantile over samples
+        mask = (df[(name,'MAG')] +df[(name,'MAG_err')])/mag0 < 0.98 * (df[(name,'MAG')]/mag0).quantile(0.95)
         df.loc[mask, name] = df[name][mask].ffill()
         if np.any(mask):
             print(name, 'removed data fraction due to suspected bema loss:', 1 -mask.sum() / len(mask))

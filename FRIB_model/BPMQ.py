@@ -38,16 +38,17 @@ def get_BPMQ_training_data_from_ISAAC_data(ISAAC_data_rel_path,
     if from_element is None:
         for i in range(i_from_element,0,-1):
             try:
-                from_element = fm.get_element(index=i)[0]['properties']['name']
-                from_Dnum = get_Dnum_from_pv(from_element)
+                from_Dnum = get_Dnum_from_pv(fm.get_element(index=i)[0]['properties']['name'])
                 if from_Dnum:
                     i_from_element = i
                     break
             except:
                 continue
+        i_1before_from_element = None
     else:
         assert isinstance(from_element,str)
         i_from_element = fm.get_index_by_name(from_element)[from_element][0]
+        i_1before_from_element = i_from_element-1
         from_Dnum = get_Dnum_from_pv(from_element)
     if from_Dnum is None:
         raise ValueError('from_Dnum could not determined automatically.')
@@ -72,29 +73,20 @@ def get_BPMQ_training_data_from_ISAAC_data(ISAAC_data_rel_path,
     if to_Dnum is None:
         raise ValueError('to_Dnum could not determined automatically.')
     
-    if i_from_element==0:
-        i_from_element = None,
-        from_element = None
-        from_bmstate = fm.bmstate
-        fit_result = fit_moment1(fm,fm_evals,fm_goals,
-                     from_bmstate = from_bmstate,
-                     to_element  = i_to_element,
-                     n_try = 20,
-                     stop_criteria = 0.5,
-                     start_fit_from_current_bmstate = True,
-                     plot_fitting_quality = False,
-                    )
+    if i_1before_from_element:
+        _, from_bmstate = fm.run(to_element=i_1before_from_element)
     else:
-        _, from_bmstate = fm.run(to_element=i_from_element-1)
-        fit_result = fit_moment1(fm,fm_evals,fm_goals,
-                     from_bmstate = from_bmstate,
-                     from_element= i_from_element-1,
-                     to_element  = i_to_element,
-                     n_try = 20,
-                     stop_criteria = 0.5,
-                     start_fit_from_current_bmstate = True,
-                     plot_fitting_quality = False,
-                    )
+        from_bmstate = fm.bmstate
+    fit_result = fit_moment1(
+                 fm,fm_evals,fm_goals,
+                 from_bmstate = from_bmstate,
+                 from_element= i_1before_from_element,
+                 to_element  = i_to_element,
+                 n_try = 20,
+                 stop_criteria = 0.5,
+                 start_fit_from_current_bmstate = True,
+                 plot_fitting_quality = False,
+                )
         
     BPMname_fmindex = {elem['properties']['name']:elem['index'] 
                      for elem in fm.get_element(type='bpm') 
@@ -108,7 +100,7 @@ def get_BPMQ_training_data_from_ISAAC_data(ISAAC_data_rel_path,
         fm_evals,fm,from_bmstate,
         monitor_indices = monitor_indices,
         monitor_names   = monitor_names,
-        from_element    = max(i_from_element-1,0),
+        from_element    = i_1before_from_element,
         to_element      = i_to_element,
     )
     
@@ -165,7 +157,7 @@ def get_BPMQ_training_data_from_ISAAC_data(ISAAC_data_rel_path,
         fm_evals_new,fm,from_bmstate,
         monitor_indices = monitor_indices,
         monitor_names   = monitor_names,
-        from_element    = i_from_element-1,
+        from_element    = i_1before_from_element,
         to_element      = i_to_element,
     )
     

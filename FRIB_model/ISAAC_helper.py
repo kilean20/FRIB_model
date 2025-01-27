@@ -19,7 +19,45 @@ from .utils import get_Dnum_from_pv, post_process_BPMdf, datetime_from_Ymd_HMS, 
 from .flame_helper import convert, get_FMelem_from_PVs
 
 
+
+def get_most_recent_matching_file(directory, file_suffix='_reconst_input_3d.json'):
+    # Get all files in the directory matching the given suffix
+    matching_files = [
+        os.path.join(directory, f) for f in os.listdir(directory)
+        if f.endswith(file_suffix) and os.path.isfile(os.path.join(directory, f))
+    ]
     
+    if not matching_files:  # If no matching files are found
+        return None
+    
+    # Find the most recent file based on modification time
+    most_recent_file = max(matching_files, key=os.path.getmtime)
+    return most_recent_file
+    
+
+def get_most_recent_reconst_data(ISAAC_data_rel_path,
+                                 ISAAC_database_path,
+                                 reconst_input_file_suffix='_reconst_input_3d.json'):
+    path = os.path.join(ISAAC_database_path,ISAAC_data_rel_path)
+    f_reconst_input = get_most_recent_matching_file(path,file_suffix=reconst_input_file_suffix)
+    if f_reconst_input is None:
+        return None
+    f_summary = f_reconst_input.replace('_reconst_input_3d.json','.json')
+    f_reconst_output = f_reconst_input.replace('_reconst_input_3d.json','_reconst_output_3d')
+    f_fm = os.path.join(f_reconst_output,'flame_reconst_input.lat')
+    f_recon_out_ = os.path.basename(f_reconst_output)
+    f_reconst_output = os.path.join(f_reconst_output,f_recon_out_+'.json')
+    with open(f_reconst_input, 'r') as f:
+        reconst_input = json.load(f)
+    with open(f_summary, 'r') as f:
+        summary = json.load(f)
+    with open(f_reconst_output, 'r') as f:
+        reconst_output = json.load(f)
+    return {'reconst_summary':summary, 
+            'reconst_input'  :reconst_input, 
+            'reconst_output' :reconst_output, 
+            'fmlatfile'      :f_fm}
+
        
 def get_reconst_summary_from_ISAAC_data_rel_path(
     ISAAC_data_rel_path,
@@ -273,7 +311,7 @@ def filter_err_out_from_ISAAC_summary(ISAAC_summary: Dict) -> Tuple[int, Union[D
 
 def get_related_ISAAC_data_rel_path(ISAAC_data_rel_path, 
                                     ISAAC_database_path, 
-                                    within_minutes = 50,
+                                    within_minutes = 240,
                                     filter_out_path_with_reconstruct = True):
     segment = None
     for seg in ['BDS_BTS','LS3_BTS','FS1_BMS','FS1_CSS','FE_MEBT']:

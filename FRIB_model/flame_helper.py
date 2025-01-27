@@ -499,10 +499,10 @@ def noise2twiss(
         'yalpha': yalpha + 0.5*x[3],
         'ybeta' : ybeta * np.exp(x[4]*0.4),
         'ynemit': ynemit* np.exp(x[5]*0.2),
-        'cxy'   : np.tanh(0.5*x[6]+ np.arctanh(cxy  )),
-        'cxyp'  : np.tanh(0.5*x[7]+ np.arctanh(cxyp )),
-        'cxpy'  : np.tanh(0.5*x[8]+ np.arctanh(cxpy )),
-        'cxpyp' : np.tanh(0.5*x[9]+ np.arctanh(cxpyp)),
+        'cxy': np.tanh(0.5 * x[6] + np.arctanh(np.clip(cxy, -0.999999, 0.999999))),
+        'cxyp': np.tanh(0.5 * x[7] + np.arctanh(np.clip(cxyp, -0.999999, 0.999999))),
+        'cxpy': np.tanh(0.5 * x[8] + np.arctanh(np.clip(cxpy, -0.999999, 0.999999))),
+        'cxpyp': np.tanh(0.5 * x[9] + np.arctanh(np.clip(cxpyp, -0.999999, 0.999999))),
     }
     return twiss
 
@@ -574,7 +574,7 @@ def evaluate_flame_evals(
     monitor_names = None,
     collect_data_args = None,
     restore_configure = False,
-    ) -> float:
+    ) -> pd.DataFrame:
     """
     Evaluate FLAME evaluation results 
     """   
@@ -582,9 +582,7 @@ def evaluate_flame_evals(
         raise ValueError(f"monitor_indices or monitor_names must be provided")
     elif monitor_indices is None:
         monitor_dict = fm.get_index_by_name(monitor_names)
-        monitor_indices = []
-        for name in monitor_names:
-            monitor_indices.append(monitor_dict[name][0])
+        monitor_indices = [monitor_dict[name][0] for name in monitor_names]
         argsorted = np.argsort(monitor_indices)
         monitor_indices = [monitor_indices[i] for i in argsorted]
         monitor_names   = [monitor_names[i] for i in argsorted]
@@ -610,16 +608,25 @@ def evaluate_flame_evals(
         collect_data_args_tmp.remove("Q")
     else:
         collect_data_args_tmp = copy(collect_data_args)
-    fm_results = {(m,arg):[] for m in monitor_names for arg in collect_data_args}
+        
+        
+    #fm_results = {(m,arg):[] for m in monitor_names for arg in collect_data_args}
+    #<<
+    num_monitors = len(monitor_names)
+    num_rows = len(flame_evals['df'])
+    
+    fm_results_arrays = {
+        (m, arg): np.empty(num_rows)  for m in monitor_names for arg in collect_data_args
+    }
+    #>>
       
-    for loc,flame_eval in flame_evals['df'].iterrows():
+    for loc_idx,flame_eval in flame_evals['df'].iterrows():
         #print("loc,flame_eval",loc,flame_eval)
         for name_field, value in flame_eval.items():
             elem_name  = name_field[0]
             elem_field = name_field[1]
             elem_index = flame_evals['info'][elem_name]['index']
             fm.reconfigure(elem_index, {elem_field: value})
-        
         
         r, s = fm.run(bmstate = from_bmstate,
                       monitor = monitor_indices, 
@@ -632,61 +639,127 @@ def evaluate_flame_evals(
 
         for i,monitor in enumerate(monitor_names):
             for arg in collect_data_args: 
-                fm_results[(monitor,arg)].append(r[arg][i])
+                #fm_results[(monitor,arg)].append(r[arg][i])
+                #<<
+                fm_results_arrays[(monitor, arg)][loc_idx] = r[arg][i]
+                #>>
            
     if restore_configure:
         for conf in _restore_configs:
             fm.reconfigure(conf[0], conf[1])
         
-    return pd.DataFrame(fm_results)
+    return pd.DataFrame(fm_results_arrays)
 
 
+#<<
+# def calculate_loss_from_flame_evals_goals(
+    # flame_evals, 
+    # flame_goals,
+    # fm, #flame_utils.ModelFlame, 
+    # from_bmstate = None,
+    # from_element = None,
+    # to_element = None,
+    # return_flame_sim_result = False,
+    # restore_configure = False,
+    # normalization_factor = None
+    # ) -> float:
+    # """
+    # Evaluate FLAME evaluation results and goals.
+    # This function evaluates FLAME evaluation results against specified goals and calculates a loss value.
+    # The loss is computed based on the differences between the achieved and target values for specified FLAME elements.
+    # """  
+    # collect_data_args = flame_goals['df'].columns.get_level_values(1).unique().to_list()
+    # normalization_factor = normalization_factor or {k:1 for k in collect_data_args}
+    # assert set(collect_data_args) >= set(normalization_factor.keys())
+
+    # monitor_indices = []
+    # monitor_names   = []
+    # for name, info in flame_goals['info'].items():
+        # monitor_indices.append(info['index'])
+        # monitor_names.append(name)
+
+    # fm_results = evaluate_flame_evals(
+        # flame_evals,fm,
+        # from_bmstate = from_bmstate,
+        # from_element = from_element,
+        # to_element = to_element,
+        # monitor_indices = monitor_indices,
+        # monitor_names = monitor_names,
+        # collect_data_args = collect_data_args,
+        # restore_configure = restore_configure)
+                                      
+    # #assert set(fm_results.columns) == set(flame_goals['df'].columns), f"fm_results.columns: {fm_results.columns} does not match with  flame_goals['df'].columns: {flame_goals['df'].columns}"
+    # loss = ((fm_results - flame_goals['df'])**2).mean() 
+    # # loss = ((fm_results-flame_goals['df'])**2/(flame_goals['df'].abs()+4)**2).mean()
+    # for monitor,bmstat in flame_goals['df'].columns:
+        # loss[(monitor,bmstat)] /= (normalization_factor[bmstat]**2)
+    
+    # if return_flame_sim_result:
+        # return fm_results
+    # else:
+        # return loss.mean()
 
 def calculate_loss_from_flame_evals_goals(
-    flame_evals, 
+    flame_evals,
     flame_goals,
-    fm, #flame_utils.ModelFlame, 
-    from_bmstate = None,
-    from_element = None,
-    to_element = None,
-    return_flame_sim_result = False,
-    restore_configure = False,
-    normalization_factor = None
-    ) -> float:
+    fm,  # flame_utils.ModelFlame,
+    from_bmstate=None,
+    from_element=None,
+    to_element=None,
+    return_flame_sim_result=False,
+    restore_configure=False,
+):
     """
     Evaluate FLAME evaluation results and goals.
     This function evaluates FLAME evaluation results against specified goals and calculates a loss value.
     The loss is computed based on the differences between the achieved and target values for specified FLAME elements.
-    """  
-    collect_data_args = flame_goals['df'].columns.get_level_values(1).unique().to_list()
-    normalization_factor = normalization_factor or {k:1 for k in collect_data_args}
-    assert set(collect_data_args) >= set(normalization_factor.keys())
-
+    """
+    
+    collect_data_args = flame_goals['df'].columns.get_level_values(1).unique().tolist()
+    
+    # Create normalization factor if not present and handle missing data
+    if 'normalization_factor' not in flame_goals:
+        normalization_factor = pd.DataFrame(1, index = flame_goals['df'].index, columns = flame_goals['df'].columns)
+    else:
+        normalization_factor = flame_goals['normalization_factor'].copy()
+        for col in flame_goals['df'].columns:
+            if col not in normalization_factor.columns:
+                normalization_factor[col] = 1
+        normalization_factor = normalization_factor.fillna(1)
+    
     monitor_indices = []
-    monitor_names   = []
+    monitor_names = []
     for name, info in flame_goals['info'].items():
         monitor_indices.append(info['index'])
         monitor_names.append(name)
 
     fm_results = evaluate_flame_evals(
-        flame_evals,fm,
-        from_bmstate = from_bmstate,
-        from_element = from_element,
-        to_element = to_element,
-        monitor_indices = monitor_indices,
-        monitor_names = monitor_names,
-        collect_data_args = collect_data_args,
-        restore_configure = restore_configure)
-                                      
-    loss = ((fm_results - flame_goals['df'])**2).mean()    
-    # loss = ((fm_results-flame_goals['df'])**2/(flame_goals['df'].abs()+4)**2).mean()
-    for monitor,bmstat in flame_goals['df'].columns:
-        loss[(monitor,bmstat)] /= (normalization_factor[bmstat]**2)
+        flame_evals,
+        fm,
+        from_bmstate=from_bmstate,
+        from_element=from_element,
+        to_element=to_element,
+        monitor_indices=monitor_indices,
+        monitor_names=monitor_names,
+        collect_data_args=collect_data_args,
+        restore_configure=restore_configure,
+    )
+
+    # Calculate loss using vectorized operations and handle NaN
+    loss = (fm_results - flame_goals['df'])**2
     
+    # Apply normalization and average
+    for monitor, bmstat in flame_goals['df'].columns:
+      loss[(monitor,bmstat)] /= (normalization_factor[(monitor,bmstat)]**2)
+    
+    loss = loss.mean().mean()
+    
+
     if return_flame_sim_result:
         return fm_results
     else:
-        return loss.mean()
+        return loss        
+        
 
 
 def fit_moment1(fm, 
@@ -724,31 +797,34 @@ def fit_moment1(fm,
     _restore_configs = [(flame_evals['info'][name]['index'], 
                         {field: fm.get_element(index=flame_evals['info'][name]['index'])[0]['properties'][field]})
                        for name,field in flame_evals['df'].columns]
-
+        
+        
     def loss_ftn(x: np.ndarray) -> float:
-        noise2bmstate(from_bmstate, x,
-                      xalpha, xbeta, xnemit, yalpha, ybeta, ynemit, cxy, cxyp, cxpy, cxpyp)
-
-        loss = calculate_loss_from_flame_evals_goals(flame_evals, flame_goals, fm, 
-                                          from_bmstate = from_bmstate, 
-                                          from_element = from_element, 
-                                          to_element = to_element, 
-                                          )
+        noise2bmstate(from_bmstate, x, xalpha, xbeta, xnemit, yalpha, ybeta, ynemit, cxy, cxyp, cxpy, cxpyp)
+        loss = calculate_loss_from_flame_evals_goals( flame_evals, flame_goals, fm, 
+                                                      from_bmstate = from_bmstate, 
+                                                      from_element = from_element, 
+                                                      to_element = to_element, 
+                                                      )
         # reg_loss = max(from_bmstate.xnemittance/from_bmstate.ynemittance,from_bmstate.ynemittance/from_bmstate.xnemittance)
         # reg_loss = (max(reg_loss,1.5) - 1.5)**2
-      
-        return loss# + 0.01*reg_loss
+
+        return loss# + 0.01reg_loss
+        
+    if stop_criteria is None:
+        stop_criteria = 1e-4
+        
 
     result = NelderMead(loss_ftn, np.zeros(10),
                         simplex_size = 0.1, 
                         bounds = None, 
-                        tol = min(1e-4, stop_criteria*0.1) )
+                        tol = 0.1*stop_criteria )
     best_loss = result.fun
     best_result = result
     x0 = []
     i=0
     for i in range(n_try-1):
-        if best_loss < stop_criteria:
+        if best_loss < stop_criteria and i>0:
                 break
         if len(x0) == 0:
             x0.append(result.x)
@@ -760,7 +836,7 @@ def fit_moment1(fm,
         result = NelderMead(loss_ftn, x0[-1].copy(),
                             simplex_size = 0.1, 
                             bounds = None, 
-                            tol = min(1e-4, stop_criteria*0.1))
+                            tol = 0.1*stop_criteria )
         if result.fun < best_loss:
             best_result = result
             best_loss = result.fun
@@ -815,7 +891,7 @@ def fit_moment1(fm,
 
         
         
-def make_FALEM_evals_or_goals(fm,tuples_of_fm_elem_names_n_fields=None,values=None,df=None,
+def make_FLAME_evals_or_goals(fm,tuples_of_fm_elem_names_n_fields=None,values=None,df=None,
                               ):
     if df is None:
         assert tuples_of_fm_elem_names_n_fields is not None
@@ -843,3 +919,20 @@ def make_FALEM_evals_or_goals(fm,tuples_of_fm_elem_names_n_fields=None,values=No
         'info': info,
         'df':df
     }
+    
+    
+def bmstate2cs(bmstate):
+    return {
+        'alfx': bmstate.get_twiss('x')[0],
+        'betx': bmstate.get_twiss('x')[1],
+        'emitx': bmstate.xemittance,
+        'emitxn': bmstate.xnemittance,
+        'alfy': bmstate.get_twiss('y')[0],
+        'bety': bmstate.get_twiss('y')[1],
+        'emity': bmstate.yemittance,
+        'emityn': bmstate.ynemittance,
+        'cxy': bmstate.couple_xy,
+        'cxpy': bmstate.couple_xpy,
+        'cxyp': bmstate.couple_xyp,
+        'cxpyp': bmstate.couple_xpyp,
+    }    
