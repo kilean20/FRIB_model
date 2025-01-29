@@ -698,7 +698,14 @@ def evaluate_flame_evals(
         # return fm_results
     # else:
         # return loss.mean()
-
+def regloss(x,xmin,xmid,xmax,scale):
+    if x < xmin:
+        return ((xmin - x)/scale) ** 2 + 0.05*((x - xmid)/scale)**2
+    if x > xmax:
+        return ((xmax - x)/scale) ** 2 + 0.05*((x - xmid)/scale)**2
+    return 0.05*((x - xmid)/scale)**2
+    
+    
 def calculate_loss_from_flame_evals_goals(
     flame_evals,
     flame_goals,
@@ -753,8 +760,12 @@ def calculate_loss_from_flame_evals_goals(
       loss[(monitor,bmstat)] /= (normalization_factor[(monitor,bmstat)]**2)
     
     loss = loss.mean().mean()
+    alfx, betx = fm.bmstate.get_twiss('x')[:2]
+    alfy, bety = fm.bmstate.get_twiss('y')[:2]
+    reg_loss = regloss(from_bmstate.xnemittance,0.05,0.1,0.25,0.1) + regloss(from_bmstate.ynemittance,0.05,0.1,0.25,0.1) +\
+               regloss(alfx,-3,0,3,3) + regloss(alfy,-3,0,3,3) + regloss(betx,0.5,8,30,10) + regloss(bety,0.5,8,30,10)
+    loss = loss + 2e-3*reg_loss
     
-
     if return_flame_sim_result:
         return fm_results
     else:
